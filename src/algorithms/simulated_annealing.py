@@ -1,5 +1,5 @@
-# simulated annealing berdasarkan alur materi03 slide 33-36
-# final menyimpan state terakhir, best menyimpan state terbaik selama pencarian
+
+# final akan save  state terakhir, best menyimpan state terbaik selama pencarian
 
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ from src.search_space import (
 )
 
 
-# parameter sa mengikuti config yg dipakai cli dan frontend
-# frozen membuat parameter tidak bisa diganti setelah config dibuat
 @dataclass(frozen=True)
 class SAConfig:
     max_iterations: int
@@ -39,7 +37,7 @@ class SAConfig:
         if self.max_iterations < 0:
             raise ValueError("max_iterations harus integer >= 0")
 
-        # suhu harus positif dan tidak boleh nan atau tak hingga
+        # suhu harus positif, cant null or takhingga
         if not math.isfinite(self.initial_temperature):
             raise ValueError("initial_temperature harus angka berhingga > 0")
         if self.initial_temperature <= 0:
@@ -56,14 +54,14 @@ class SAConfig:
             raise ValueError("min_temperature harus angka berhingga > 0")
 
 
-# bentuk schedule yg dipilih tim
+# schedule Temp buat turun bertahap with iteration agar sesuai jg dengan konsep eksplorasiny
 # iterasi pertama pakai suhu awal, lalu turun sesuai cooling rate
 def temperature_at(cfg: SAConfig, iteration: int) -> float:
     return cfg.initial_temperature * cfg.cooling_rate ** (iteration - 1)
 
 
-# delta positif berarti kandidat lebih baik karena objective dimaksimalkan
-# kandidat yg lebih buruk punya peluang diterima sebesar exp(delta / temperature)
+# delta positif berarti candiatenya lebih baik karena objective dimaksimalkan
+# candidate yg lebih buruk punya peluang diterima sebesar exp(delta / temperature)
 def acceptance_probability(delta: float, temperature: float) -> float:
     if temperature <= 0:
         raise ValueError("temperature harus > 0 sebelum menghitung e^(dE/T)")
@@ -88,7 +86,6 @@ def is_local_optimum(state, problem) -> bool:
 
 
 def simulated_annealing(problem, config, seed: int) -> RunResult:
-    # 1. siapkan config dan satu rng untuk seluruh proses pencarian
     if isinstance(config, SAConfig):
         settings = config
     else:
@@ -110,9 +107,9 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
     stuck_cache = {}
     check_time = 0.0
 
-    # simpan hasil cek supaya state yg sama tidak perlu diperiksa ulang
+    # save hasil cek supaya state yg sama gaperlu dicek lg 
     def check_stuck(state):
-        nonlocal check_time  # memperbarui variabel waktu milik fungsi utama
+        nonlocal check_time  #update check_time
 
         if not settings.detect_stuck:
             return None
@@ -130,7 +127,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
 
         return stuck_cache[state]
 
-    # 2. buat initial state random dan mulai pengukuran runtime
+    # ini buat initial state random dan mulai pengukuran runtime
     # raw menyimpan satu dictionary per iterasi sebelum dibuat menjadi history
     raw = []
     start = time.perf_counter()
@@ -145,7 +142,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
     is_stuck = check_stuck(current)
     initial_stuck = is_stuck
 
-    # initial state yg sudah local optimum dihitung sebagai episode pertama
+    # initial state yg sudah local optimum dihitung sebagai first eps
     stuck_events = 0
     if is_stuck:
         stuck_events = 1
@@ -171,7 +168,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
     termination = "max_iterations"
     last_temperature = None
 
-    # 3. hitung suhu lalu coba satu random neighbor pada setiap iterasi
+    # itung suhu trs coba satu random neighbor pada setiap iterasi
     for iteration in range(1, settings.max_iterations + 1):
         temperature = temperature_at(settings, iteration)
 
@@ -182,8 +179,8 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
         last_temperature = temperature
         candidate = random_feasible_neighbor(current, problem, rng)
 
-        # pencarian neighbor bisa gagal setelah batas percobaan random habis
-        # kondisi ini saja belum membuktikan current berada di local optimum
+        # proses searching neighbor bisa fail IF batas percobaan random habis
+        # condition ini belum ngasih valid reason bahwa current berada di local optimum
         if candidate is None:
             counters["no_candidate"] += 1
 
@@ -210,8 +207,8 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
         probability = acceptance_probability(delta, temperature)
         draw = None
 
-        # kandidat lebih baik atau sama selalu diterima
-        # angka random hanya diambil kalau kandidat lebih buruk
+        # candidate yg lebih baik atau sama selalu diterima
+        # angka random cmn diambil kalau candidate lebih buruk
         if delta > 0:
             accepted = True
             reason = "better"
@@ -237,8 +234,8 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
         move = describe_move(current, candidate, problem)
         stuck_event = False
 
-        # kalau diterima, pindahkan current ke kandidat
-        # best hanya diperbarui saat menemukan nilai yg lebih tinggi
+        # kalau diterima,  current di move ke candidate
+        # best di update cmn pas nemuin nilai yg lebih tinggi
         if accepted:
             current = candidate
             current_value = candidate_value
@@ -248,8 +245,8 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
                 best_value = current_value
                 best_iteration = iteration
 
-            # hitung episode saat baru masuk local optimum
-            # pindah dari satu state stuck ke state stuck lain masih satu episode
+            # episode diitung saat baru masuk local optimum
+            # pindah dari satu state stuck ke state stuck lain in 1 eps
             new_stuck = check_stuck(current)
 
             if new_stuck and not is_stuck:
@@ -279,14 +276,11 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
 
     runtime = time.perf_counter() - start
 
-    # 4. susun history untuk grafik dan replay setelah timer berhenti
+    # history untuk grafik dan replay setelah timer stop
     history = []
 
     for item in raw:
         current_state = None
-
-        # simpan snapshot awal dan setiap kandidat diterima
-        # selain itu frontend memakai kembali snapshot sebelumnya
         if settings.record_snapshots:
             if item["iteration"] == 0 or item["accepted"]:
                 current_state = snapshot(item["state"], problem)
@@ -312,7 +306,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
             "current_state": current_state,
         })
 
-    # none berarti deteksi dimatikan, berbeda dengan nol kejadian
+    # none berarti detection mati, bukan zero accident 
     total_stuck = None
     total_escapes = None
 
@@ -320,7 +314,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
         total_stuck = stuck_events
         total_escapes = escapes
 
-    # 5. rangkum hasil menggunakan format yg dipakai modul bersama
+    # summary
     initial = raw[0]["state"]
 
     metrics = {
@@ -344,9 +338,7 @@ def simulated_annealing(problem, config, seed: int) -> RunResult:
         "local_optimum_cache_hits": counters["local_optimum_cache_hits"],
         "local_optimum_check_seconds": check_time,
     }
-
-    # final tetap memakai current karena sa boleh menerima langkah yg lebih buruk
-    # solusi terbaik selama pencarian sudah disimpan terpisah di metrics
+    
     return RunResult(
         algorithm="sa",
         seed=seed,
