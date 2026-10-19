@@ -1,0 +1,14 @@
+{
+  "algorithm": "sa",
+  "problem": "configs/problem.json",
+  "output_dir": "output/simulated_annealing",
+  "config": {
+    "max_iterations": 5000,
+    "initial_temperature": 50.0,
+    "cooling_rate": 0.998,
+    "min_temperature": 0.05,
+    "detect_stuck": true,
+    "record_snapshots": true
+  },
+  "seeds": [4001, 4002, 4003]
+}

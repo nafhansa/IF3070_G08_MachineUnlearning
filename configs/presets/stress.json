@@ -1,0 +1,20 @@
+{
+  "name": "stress-orientation-capacity",
+  "metadata": {
+    "source": "handcrafted stress preset (bukan data resmi)",
+    "note": "R1/R2 (7x1) hanya muat bila dirotasi ke V (footprint 1x7) karena lebar deck 6. total berat 156 jauh di atas kapasitas 60, total area 55 > 48. optimum tidak diklaim."
+  },
+  "ship": {"width": 6, "length": 8, "max_capacity": 60},
+  "vehicles": [
+    {"id": "R1", "width": 7, "length": 1, "shipping_fee": 50, "weight": 12, "eta": 2},
+    {"id": "R2", "width": 7, "length": 1, "shipping_fee": 45, "weight": 12, "eta": 3},
+    {"id": "H1", "width": 3, "length": 3, "shipping_fee": 90, "weight": 45, "eta": 1},
+    {"id": "H2", "width": 2, "length": 4, "shipping_fee": 70, "weight": 35, "eta": 1},
+    {"id": "S1", "width": 2, "length": 2, "shipping_fee": 25, "weight": 8, "eta": 4},
+    {"id": "S2", "width": 2, "length": 2, "shipping_fee": 25, "weight": 8, "eta": 5},
+    {"id": "S3", "width": 1, "length": 2, "shipping_fee": 12, "weight": 4, "eta": 2},
+    {"id": "S4", "width": 1, "length": 2, "shipping_fee": 12, "weight": 4, "eta": 6},
+    {"id": "M1", "width": 2, "length": 3, "shipping_fee": 35, "weight": 14, "eta": 3},
+    {"id": "M2", "width": 3, "length": 2, "shipping_fee": 35, "weight": 14, "eta": 7}
+  ]
+}

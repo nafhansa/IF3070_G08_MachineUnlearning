@@ -1,0 +1,22 @@
+{
+  "problem": "configs/problem.json",
+  "output_dir": "output/genetic_algorithm",
+  "ga_defaults": {
+    "crossover_rate": 0.9,
+    "mutation_rate": 0.2,
+    "elite_count": 1,
+    "repair_tries": 20,
+    "record_snapshots": true
+  },
+  "experiment_a": {
+    "population_size": 50,
+    "generations": [50, 150, 300],
+    "seeds": [[1001, 1002, 1003], [1004, 1005, 1006], [1007, 1008, 1009]]
+  },
+  "experiment_b": {
+    "generations": 150,
+    "population_sizes": [20, 50, 100],
+    "seeds": [[2001, 2002, 2003], [2004, 2005, 2006], [2007, 2008, 2009]]
+  },
+  "baseline": {"samples": 1000, "seed": 0}
+}

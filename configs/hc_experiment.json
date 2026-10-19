@@ -1,0 +1,7 @@
+{
+  "algorithm": "hc",
+  "problem": "configs/problem.json",
+  "output_dir": "output/hill_climbing",
+  "config": {"max_iterations": 2000, "record_snapshots": true},
+  "seeds": [3001, 3002, 3003]
+}

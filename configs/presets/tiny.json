@@ -1,0 +1,14 @@
+{
+  "name": "tiny-teaching",
+  "metadata": {
+    "source": "handcrafted teaching preset (bukan data resmi)",
+    "note": "deck 4x3, kapasitas 10. optimum exact = 230 (D + C), dibuktikan baseline.exact_optimum; A+B+C = 210 walau berat tepat 10"
+  },
+  "ship": {"width": 4, "length": 3, "max_capacity": 10},
+  "vehicles": [
+    {"id": "A", "width": 2, "length": 3, "shipping_fee": 100, "weight": 5, "eta": 1},
+    {"id": "B", "width": 2, "length": 2, "shipping_fee": 80, "weight": 4, "eta": 2},
+    {"id": "C", "width": 1, "length": 2, "shipping_fee": 30, "weight": 1, "eta": 3},
+    {"id": "D", "width": 2, "length": 1, "shipping_fee": 200, "weight": 7, "eta": 1}
+  ]
+}
