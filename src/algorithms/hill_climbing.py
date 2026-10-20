@@ -27,12 +27,12 @@ from src.search_space import describe_move, random_feasible_neighbor, random_fea
 
 def hill_climbing(problem, config, seed):
     # 1. read and ngecek config
-    max_iteration = config["max_iterations"]
+    max_iterations = config["max_iterations"]
 
     # True/False di Python dianggapnya angka juga, jadi harus manually ditolak
     is_valid_number = isinstance(max_iterations, int) and not isinstance(max_iterations,bool)
-    is not is_valid_number or max_iterations < 0:
-        raise valueError("max_iterations harus integer >= 0")
+    if not is_valid_number or max_iterations < 0:
+        raise ValueError("max_iterations harus integer >= 0")
     
     # Kalau tidak diisi, snapshot disimpan (default True)
     save_snapshots = config.get("record_snapshots", True)
@@ -64,7 +64,7 @@ def hill_climbing(problem, config, seed):
 
     # nambahin logs dari hasil iterasinya 
     iteration_log.append({
-        "itereation": 0,
+        "iteration": 0,
         "state": current_state,
         "value": current_value,
         "neighbor_value": None,
@@ -101,13 +101,13 @@ def hill_climbing(problem, config, seed):
             count_improved += 1
             last_improvement_iteration = iteration
             accepted = True
-            reasion = "improved"
+            reason = "improved"
 
         # Kasus 3: nilainya sama, tidak pindah
         elif neighbor_value == current_value:
             count_equal += 1
             accepted = False
-            reasion = "equal"
+            reason = "equal"
 
         # Kasus 4: tetangganya lebih jelek, tidak pindah
         else:
