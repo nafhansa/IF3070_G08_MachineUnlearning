@@ -19,13 +19,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
 
 from src.algorithms.genetic_algorithm import genetic_algorithm  # noqa: E402
-from src.algorithms.hill_climbing import hill_climbing  # noqa: E402
+from src.algorithms.hc_stochastic import hc_stochastic  # noqa: E402
 from src.algorithms.simulated_annealing import simulated_annealing  # noqa: E402
 from src.baseline import random_baseline  # noqa: E402
 from src.core import Problem, Ship, Vehicle, load_problem  # noqa: E402
 
 # registry tunggal algoritma yang sudah ada; dipakai runner, CLI, dan server
-ALGORITHMS = {"ga": genetic_algorithm, "hc": hill_climbing, "sa": simulated_annealing}
+ALGORITHMS = {"ga": genetic_algorithm, "hc": hc_stochastic, "sa": simulated_annealing}
 
 
 # --- instance sintetis ------------------------------------------------------------
