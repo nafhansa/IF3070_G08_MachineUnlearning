@@ -1,12 +1,6 @@
-
-# final akan save  state terakhir, best menyimpan state terbaik selama pencarian
-
-from __future__ import annotations
-
 import math
 import random
 import time
-from dataclasses import asdict, dataclass
 
 from src.core import objective, problem_to_dict
 from src.result import RunResult, snapshot
@@ -17,338 +11,315 @@ from src.search_space import (
     random_feasible_state,
 )
 
+def temperature_at(initial_temperature, cooling_rate, iteration):
+    return initial_temperature * cooling_rate ** (iteration - 1)
 
-@dataclass(frozen=True)
-class SAConfig:
-    max_iterations: int
-    initial_temperature: float
-    cooling_rate: float
-    min_temperature: float
-    detect_stuck: bool = True
-    record_snapshots: bool = True
-
-    # otomatis dipanggil setelah config dibuat untuk mengecek input
-    def __post_init__(self):
-        # bool dicek terpisah karena di python bool juga termasuk int
-        if isinstance(self.max_iterations, bool):
-            raise ValueError("max_iterations harus integer >= 0")
-        if not isinstance(self.max_iterations, int):
-            raise ValueError("max_iterations harus integer >= 0")
-        if self.max_iterations < 0:
-            raise ValueError("max_iterations harus integer >= 0")
-
-        # suhu harus positif, cant null or takhingga
-        if not math.isfinite(self.initial_temperature):
-            raise ValueError("initial_temperature harus angka berhingga > 0")
-        if self.initial_temperature <= 0:
-            raise ValueError("initial_temperature harus angka berhingga > 0")
-
-        if not math.isfinite(self.cooling_rate):
-            raise ValueError("cooling_rate harus di (0, 1) agar suhu turun")
-        if self.cooling_rate <= 0 or self.cooling_rate >= 1:
-            raise ValueError("cooling_rate harus di (0, 1) agar suhu turun")
-
-        if not math.isfinite(self.min_temperature):
-            raise ValueError("min_temperature harus angka berhingga > 0")
-        if self.min_temperature <= 0:
-            raise ValueError("min_temperature harus angka berhingga > 0")
-
-
-# schedule Temp buat turun bertahap with iteration agar sesuai jg dengan konsep eksplorasiny
-# iterasi pertama pakai suhu awal, lalu turun sesuai cooling rate
-def temperature_at(cfg: SAConfig, iteration: int) -> float:
-    return cfg.initial_temperature * cfg.cooling_rate ** (iteration - 1)
-
-
-# delta positif berarti candiatenya lebih baik karena objective dimaksimalkan
-# candidate yg lebih buruk punya peluang diterima sebesar exp(delta / temperature)
-def acceptance_probability(delta: float, temperature: float) -> float:
-    if temperature <= 0:
-        raise ValueError("temperature harus > 0 sebelum menghitung e^(dE/T)")
-
+def acceptance_probability(delta, temperature):
+    # delta positif berarti candidate lebih baik karena objective dimaksimalkan
     if delta >= 0:
         return 1.0
-
     return math.exp(delta / temperature)
 
-
-# cukup temukan satu neighbor lebih baik untuk membuktikan belum local optimum
-def is_local_optimum(state, problem) -> bool:
+def is_local_optimum(state, problem):
+    # satu neighbor yang lebih baik berarti state belum local optimum
     current_value = objective(state, problem)
-
-    for move, neighbor in generate_feasible_neighbors(state, problem):
-        neighbor_value = objective(neighbor, problem)
-
-        if neighbor_value > current_value:
+    for _, neighbor in generate_feasible_neighbors(state, problem):
+        if objective(neighbor, problem) > current_value:
             return False
-
     return True
 
+def make_log(iteration, state, value, best_value, candidate_value=None,
+             delta=None, temperature=None, probability=None, random_draw=None,
+             accepted=False, move=None, reason=""):
+    return {
+        "iteration": iteration, "state": state, "value": value,
+        "best_value": best_value, "candidate_value": candidate_value,
+        "delta": delta, "temperature": temperature,
+        "probability": probability, "random_draw": random_draw,
+        "accepted": accepted, "move": move, "reason": reason,
+    }
 
-def simulated_annealing(problem, config, seed: int) -> RunResult:
-    if isinstance(config, SAConfig):
-        settings = config
-    else:
-        # config dari dictionary diubah menjadi objek SAConfig
-        settings = SAConfig(**config)
+def check_stuck_history(iteration_log, problem, detect_stuck):
+    # pengecekan stuck dilakukan setelah timer searching berhenti
+    if not detect_stuck:
+        for entry in iteration_log:
+            entry["stuck"] = None
+            entry["stuck_event"] = False
+        return None, None, None, 0, 0, 0.0
 
-    rng = random.Random(seed)
+    cache = {}
+    stuck_events = 0
+    escape_count = 0
+    check_count = 0
+    cache_hits = 0
+    check_seconds = 0.0
+    previous_stuck = False
 
-    counters = {
+    for entry in iteration_log:
+        state_changed = entry["iteration"] == 0 or entry["accepted"]
+
+        if state_changed:
+            state = entry["state"]
+
+            if state in cache:
+                current_stuck = cache[state]
+                cache_hits += 1
+            else:
+                check_start = time.perf_counter()
+                current_stuck = is_local_optimum(state, problem)
+                check_seconds += time.perf_counter() - check_start
+                cache[state] = current_stuck
+                check_count += 1
+        else:
+            current_stuck = previous_stuck
+
+        stuck_event = current_stuck and not previous_stuck
+
+        if stuck_event:
+            stuck_events += 1
+        elif previous_stuck and not current_stuck:
+            escape_count += 1
+
+        entry["stuck"] = current_stuck
+        entry["stuck_event"] = stuck_event
+        previous_stuck = current_stuck
+
+    initial_stuck = iteration_log[0]["stuck"]
+
+    return (
+        stuck_events, escape_count, initial_stuck,
+        check_count, cache_hits, check_seconds,
+    )
+
+def simulated_annealing(problem, config, seed):
+    # 1. read and cek config
+    max_iterations = config["max_iterations"]
+    initial_temperature = config["initial_temperature"]
+    cooling_rate = config["cooling_rate"]
+    min_temperature = config["min_temperature"]
+    detect_stuck = config.get("detect_stuck", True)
+    save_snapshots = config.get("record_snapshots", True)
+
+    valid_iterations = (
+        isinstance(max_iterations, int)
+        and not isinstance(max_iterations, bool)
+    )
+
+    if not valid_iterations or max_iterations < 0:
+        raise ValueError("max_iterations harus integer >= 0")
+
+    def valid_number(value):
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+        )
+
+    if not valid_number(initial_temperature) or initial_temperature <= 0:
+        raise ValueError("initial_temperature harus angka berhingga > 0")
+
+    if not valid_number(cooling_rate) or not 0 < cooling_rate < 1:
+        raise ValueError("cooling_rate harus berada di antara 0 dan 1")
+
+    if not valid_number(min_temperature) or min_temperature <= 0:
+        raise ValueError("min_temperature harus angka berhingga > 0")
+
+    if not isinstance(detect_stuck, bool) or not isinstance(save_snapshots, bool):
+        raise ValueError("detect_stuck dan record_snapshots harus berupa boolean")
+
+    # 2. siapin variable awal
+    random_generator = random.Random(seed)
+
+    counter = {
         "accepted_better": 0,
         "accepted_equal": 0,
         "accepted_worse": 0,
         "rejected_worse": 0,
         "no_candidate": 0,
-        "local_optimum_checks": 0,
-        "local_optimum_cache_hits": 0,
     }
 
-    stuck_cache = {}
-    check_time = 0.0
+    iteration_log = []
+    start_time = time.perf_counter()
 
-    # save hasil cek supaya state yg sama gaperlu dicek lg 
-    def check_stuck(state):
-        nonlocal check_time  #update check_time
+    current_state = random_feasible_state(problem, random_generator)
+    current_value = objective(current_state, problem)
 
-        if not settings.detect_stuck:
-            return None
+    initial_state = current_state
+    initial_value = current_value
 
-        if state in stuck_cache:
-            counters["local_optimum_cache_hits"] += 1
-            return stuck_cache[state]
-
-        check_start = time.perf_counter()
-
-        stuck_cache[state] = is_local_optimum(state, problem)
-
-        check_time += time.perf_counter() - check_start
-        counters["local_optimum_checks"] += 1
-
-        return stuck_cache[state]
-
-    # ini buat initial state random dan mulai pengukuran runtime
-    # raw menyimpan satu dictionary per iterasi sebelum dibuat menjadi history
-    raw = []
-    start = time.perf_counter()
-
-    current = random_feasible_state(problem, rng)
-    current_value = objective(current, problem)
-
-    best = current
+    # current menyimpan state sekarang, best menyimpan hasil terbaik
+    best_state = current_state
     best_value = current_value
     best_iteration = 0
 
-    is_stuck = check_stuck(current)
-    initial_stuck = is_stuck
+    iteration_log.append(make_log(
+        0, current_state, current_value, best_value,
+        reason="initial",
+    ))
 
-    # initial state yg sudah local optimum dihitung sebagai first eps
-    stuck_events = 0
-    if is_stuck:
-        stuck_events = 1
+    termination_reason = "max_iterations"
+    final_temperature = None
 
-    escapes = 0
+    # 3. logic simulated annealing
+    for iteration in range(1, max_iterations + 1):
+        temperature = temperature_at(
+            initial_temperature, cooling_rate, iteration
+        )
 
-    raw.append({
-        "iteration": 0,
-        "state": current,
-        "candidate_value": None,
-        "delta": None,
-        "temperature": None,
-        "probability": None,
-        "draw": None,
-        "accepted": False,
-        "move": None,
-        "reason": "initial",
-        "best_value": best_value,
-        "stuck": is_stuck,
-        "stuck_event": bool(is_stuck),
-    })
-
-    termination = "max_iterations"
-    last_temperature = None
-
-    # itung suhu trs coba satu random neighbor pada setiap iterasi
-    for iteration in range(1, settings.max_iterations + 1):
-        temperature = temperature_at(settings, iteration)
-
-        if temperature < settings.min_temperature:
-            termination = "min_temperature"
+        if temperature < min_temperature:
+            termination_reason = "min_temperature"
             break
 
-        last_temperature = temperature
-        candidate = random_feasible_neighbor(current, problem, rng)
+        final_temperature = temperature
 
-        # proses searching neighbor bisa fail IF batas percobaan random habis
-        # condition ini belum ngasih valid reason bahwa current berada di local optimum
-        if candidate is None:
-            counters["no_candidate"] += 1
+        candidate_state = random_feasible_neighbor(
+            current_state, problem, random_generator
+        )
 
-            raw.append({
-                "iteration": iteration,
-                "state": current,
-                "candidate_value": None,
-                "delta": None,
-                "temperature": temperature,
-                "probability": None,
-                "draw": None,
-                "accepted": False,
-                "move": None,
-                "reason": "no_feasible_candidate",
-                "best_value": best_value,
-                "stuck": is_stuck,
-                "stuck_event": False,
-            })
+        # none berarti percobaan random habis, bukan pasti local optimum
+        if candidate_state is None:
+            counter["no_candidate"] += 1
 
+            iteration_log.append(make_log(
+                iteration, current_state, current_value, best_value,
+                temperature=temperature,
+                reason="no_feasible_candidate",
+            ))
             continue
 
-        candidate_value = objective(candidate, problem)
+        candidate_value = objective(candidate_state, problem)
         delta = candidate_value - current_value
         probability = acceptance_probability(delta, temperature)
-        draw = None
+        random_draw = None
 
-        # candidate yg lebih baik atau sama selalu diterima
-        # angka random cmn diambil kalau candidate lebih buruk
         if delta > 0:
             accepted = True
             reason = "better"
-            counters["accepted_better"] += 1
+            counter["accepted_better"] += 1
 
         elif delta == 0:
             accepted = True
             reason = "equal"
-            counters["accepted_equal"] += 1
+            counter["accepted_equal"] += 1
 
         else:
-            draw = rng.random()
+            random_draw = random_generator.random()
+            accepted = random_draw < probability
+            reason = "worse_accepted" if accepted else "worse_rejected"
 
-            if draw < probability:
-                accepted = True
-                reason = "worse_accepted"
-                counters["accepted_worse"] += 1
+            if accepted:
+                counter["accepted_worse"] += 1
             else:
-                accepted = False
-                reason = "worse_rejected"
-                counters["rejected_worse"] += 1
+                counter["rejected_worse"] += 1
 
-        move = describe_move(current, candidate, problem)
-        stuck_event = False
+        move = describe_move(current_state, candidate_state, problem)
 
-        # kalau diterima,  current di move ke candidate
-        # best di update cmn pas nemuin nilai yg lebih tinggi
+        # current pindah kalau candidate diterima
         if accepted:
-            current = candidate
+            current_state = candidate_state
             current_value = candidate_value
 
+            # best cuma berubah kalau nilainya lebih tinggi
             if current_value > best_value:
-                best = current
+                best_state = current_state
                 best_value = current_value
                 best_iteration = iteration
 
-            # episode diitung saat baru masuk local optimum
-            # pindah dari satu state stuck ke state stuck lain in 1 eps
-            new_stuck = check_stuck(current)
+        iteration_log.append(make_log(
+            iteration, current_state, current_value, best_value,
+            candidate_value, delta, temperature, probability,
+            random_draw, accepted, move, reason,
+        ))
 
-            if new_stuck and not is_stuck:
-                stuck_events += 1
-                stuck_event = True
+    runtime_seconds = time.perf_counter() - start_time
 
-            elif is_stuck and not new_stuck:
-                escapes += 1
+    # 4. cek stuck di luar runtime searching
+    stuck_result = check_stuck_history(
+        iteration_log, problem, detect_stuck
+    )
 
-            is_stuck = new_stuck
+    (
+        stuck_events,
+        escape_count,
+        initial_stuck,
+        check_count,
+        cache_hits,
+        check_seconds,
+    ) = stuck_result
 
-        raw.append({
-            "iteration": iteration,
-            "state": current,
-            "candidate_value": candidate_value,
-            "delta": delta,
-            "temperature": temperature,
-            "probability": probability,
-            "draw": draw,
-            "accepted": accepted,
-            "move": move,
-            "reason": reason,
-            "best_value": best_value,
-            "stuck": is_stuck,
-            "stuck_event": stuck_event,
-        })
-
-    runtime = time.perf_counter() - start
-
-    # history untuk grafik dan replay setelah timer stop
+    # 5. convert ke history
     history = []
 
-    for item in raw:
-        current_state = None
-        if settings.record_snapshots:
-            if item["iteration"] == 0 or item["accepted"]:
-                current_state = snapshot(item["state"], problem)
+    for entry in iteration_log:
+        state_changed = (
+            entry["iteration"] == 0
+            or entry["accepted"]
+        )
 
-        move_data = None
-        if item["move"]:
-            move_data = list(item["move"])
+        if save_snapshots and state_changed:
+            state_snapshot = snapshot(entry["state"], problem)
+        else:
+            state_snapshot = None
 
         history.append({
-            "iteration": item["iteration"],
-            "current_objective": objective(item["state"], problem),
-            "best_so_far_objective": item["best_value"],
-            "candidate_objective": item["candidate_value"],
-            "delta_e": item["delta"],
-            "temperature": item["temperature"],
-            "acceptance_probability": item["probability"],
-            "random_draw": item["draw"],
-            "accepted": item["accepted"],
-            "move": move_data,
-            "reason": item["reason"],
-            "stuck": item["stuck"],
-            "stuck_event": item["stuck_event"],
-            "current_state": current_state,
+            "iteration": entry["iteration"],
+            "current_objective": entry["value"],
+            "best_so_far_objective": entry["best_value"],
+            "candidate_objective": entry["candidate_value"],
+            "delta_e": entry["delta"],
+            "temperature": entry["temperature"],
+            "acceptance_probability": entry["probability"],
+            "random_draw": entry["random_draw"],
+            "accepted": entry["accepted"],
+            "move": list(entry["move"]) if entry["move"] else None,
+            "reason": entry["reason"],
+            "stuck": entry["stuck"],
+            "stuck_event": entry["stuck_event"],
+            "current_state": state_snapshot,
         })
 
-    # none berarti detection mati, bukan zero accident 
-    total_stuck = None
-    total_escapes = None
-
-    if settings.detect_stuck:
-        total_stuck = stuck_events
-        total_escapes = escapes
-
-    # summary
-    initial = raw[0]["state"]
+    # 6. summary
+    iterations_run = len(iteration_log) - 1
 
     metrics = {
-        "accepted_better": counters["accepted_better"],
-        "accepted_equal": counters["accepted_equal"],
-        "accepted_worse": counters["accepted_worse"],
-        "rejected_worse": counters["rejected_worse"],
-        "no_candidate": counters["no_candidate"],
-        "iterations_run": len(raw) - 1,
-        # menghitung evaluasi initial dan kandidat, di luar cek local optimum
-        "objective_evaluations": len(raw) - counters["no_candidate"],
-        "termination_reason": termination,
-        "final_temperature": last_temperature,
+        **counter,
+        "iterations_run": iterations_run,
+        "objective_evaluations": (
+            1 + iterations_run - counter["no_candidate"]
+        ),
+        "termination_reason": termination_reason,
+        "final_temperature": final_temperature,
         "best_found_objective": best_value,
         "best_found_iteration": best_iteration,
-        "best_found_state": snapshot(best, problem),
-        "stuck_event_count": total_stuck,
-        "escape_count": total_escapes,
+        "best_found_state": snapshot(best_state, problem),
+        "stuck_event_count": stuck_events,
+        "escape_count": escape_count,
         "initial_stuck": initial_stuck,
-        "local_optimum_checks": counters["local_optimum_checks"],
-        "local_optimum_cache_hits": counters["local_optimum_cache_hits"],
-        "local_optimum_check_seconds": check_time,
+        "local_optimum_checks": check_count,
+        "local_optimum_cache_hits": cache_hits,
+        "local_optimum_check_seconds": check_seconds,
     }
-    
+
+    used_config = {
+        "max_iterations": max_iterations,
+        "initial_temperature": initial_temperature,
+        "cooling_rate": cooling_rate,
+        "min_temperature": min_temperature,
+        "detect_stuck": detect_stuck,
+        "record_snapshots": save_snapshots,
+    }
+
+    # 7. cover semua hasil jadi RunResult
     return RunResult(
         algorithm="sa",
         seed=seed,
-        config=asdict(settings),
+        config=used_config,
         problem=problem_to_dict(problem),
-        initial_state=snapshot(initial, problem),
-        final_state=snapshot(current, problem),
-        initial_objective=objective(initial, problem),
+        initial_state=snapshot(initial_state, problem),
+        final_state=snapshot(current_state, problem),
+        initial_objective=initial_value,
         final_objective=current_value,
-        runtime_seconds=runtime,
+        runtime_seconds=runtime_seconds,
         history=history,
         metrics=metrics,
     )
