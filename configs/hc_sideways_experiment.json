@@ -1,0 +1,7 @@
+{
+  "algorithm": "hc_sideways",
+  "problem": "configs/problem.json",
+  "output_dir": "output/hc_sideways",
+  "config": {"max_sideways": 100, "max_iterations": 1000, "record_snapshots": true},
+  "seeds": [3201, 3202, 3203]
+}

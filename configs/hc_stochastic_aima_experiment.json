@@ -1,0 +1,7 @@
+{
+  "algorithm": "hc_stochastic_aima",
+  "problem": "configs/problem.json",
+  "output_dir": "output/hc_stochastic_aima",
+  "config": {"max_iterations": 1000, "selection": "proportional", "record_snapshots": true},
+  "seeds": [3401, 3402, 3403]
+}
