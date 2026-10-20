@@ -24,7 +24,7 @@ from src.algorithms.simulated_annealing import simulated_annealing  # noqa: E402
 from src.baseline import random_baseline  # noqa: E402
 from src.core import Problem, Ship, Vehicle, load_problem  # noqa: E402
 
-# registry tunggal algoritma; dipakai runner dan CLI
+# registry tunggal algoritma yang sudah ada; dipakai runner, CLI, dan server
 ALGORITHMS = {"ga": genetic_algorithm, "hc": hill_climbing, "sa": simulated_annealing}
 
 
