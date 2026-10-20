@@ -19,13 +19,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
 
 from src.algorithms.genetic_algorithm import genetic_algorithm  # noqa: E402
-from src.algorithms.hill_climbing import hill_climbing  # noqa: E402
+from src.algorithms.hc_stochastic import hc_stochastic  # noqa: E402
+from src.algorithms.hc_variants import HC_VARIANTS  # noqa: E402
 from src.algorithms.simulated_annealing import simulated_annealing  # noqa: E402
 from src.baseline import random_baseline  # noqa: E402
 from src.core import Problem, Ship, Vehicle, load_problem  # noqa: E402
 
 # registry tunggal algoritma yang sudah ada; dipakai runner, CLI, dan server
-ALGORITHMS = {"ga": genetic_algorithm, "hc": hill_climbing, "sa": simulated_annealing}
+ALGORITHMS = {"ga": genetic_algorithm, "hc": hc_stochastic, "sa": simulated_annealing}
 
 
 # --- instance sintetis ------------------------------------------------------------
@@ -122,6 +123,12 @@ def plot_hc_curve(ax, history):
     acc = [h for h in history if h["accepted"]]
     ax.scatter([h["iteration"] for h in acc], [h["objective"] for h in acc], color="C2", s=14, zorder=3,
                label="improvement diterima")
+    # random restart: garis putus-putus di awal tiap restart dan kurva best-so-far
+    if history and "best_so_far_objective" in history[0]:
+        for h in history:
+            if h["reason"] == "restart_initial" and h["iteration"] > 0:
+                ax.axvline(h["iteration"], color="0.6", linestyle="--", linewidth=0.8)
+        ax.plot(its, [h["best_so_far_objective"] for h in history], color="C3", label="best-so-far")
     ax.set_xlabel("iterasi")
     ax.set_ylabel("objective (total ShippingFee)")
     ax.grid(True, alpha=0.3)
@@ -188,7 +195,15 @@ def plot_run(result, path) -> None:
         draw_deck(axes[0], result.initial_state, result.problem, "initial (random)")
         draw_deck(axes[1], result.final_state, result.problem, "final (current terakhir)")
         plot_hc_curve(axes[2], result.history)
-        title = f"Stochastic HC seed={result.seed} nmax={cfg['max_iterations']}"
+        names = {"hc": "Stochastic HC", "hc_sideways": "Sideways HC", "hc_random_restart": "Random Restart HC",
+                 "hc_stochastic_aima": "Stochastic HC (AIMA)"}
+        title = f"{names.get(result.algorithm, result.algorithm)} seed={result.seed}"
+        if result.algorithm == "hc_random_restart":
+            title += f" restarts={cfg['max_restarts']} langkah/restart={cfg['iterations_per_restart']}"
+        else:
+            title += f" max_iterations={cfg['max_iterations']}"
+        if result.algorithm == "hc_sideways":
+            title += f" max_sideways={cfg['max_sideways']}"
     axes[2].set_title(f"{title}\nruntime={result.runtime_seconds:.2f}s", fontsize=9)
     fig.tight_layout()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -249,15 +264,16 @@ def _markdown_table(rows, keys):
 
 
 def run_repeated(config: dict) -> list[dict]:
-    """eksperimen hc/sa: satu konfigurasi dijalankan untuk tiap seed (spek: minimal 3 run)."""
+    """eksperimen hc/sa dan varian hc: satu konfigurasi dijalankan untuk tiap seed (spek: minimal 3 run)."""
     algorithm, seeds = config["algorithm"], config["seeds"]
     if len(seeds) < 3 or len(set(seeds)) != len(seeds):
         raise ValueError("butuh minimal 3 seed unik agar run independen")
     problem = load_problem(config["problem"])
     out = Path(config["output_dir"])
+    solver = ALGORITHMS.get(algorithm) or HC_VARIANTS[algorithm]
     rows = []
     for seed in seeds:
-        result = ALGORITHMS[algorithm](problem, config["config"], seed)
+        result = solver(problem, config["config"], seed)
         json_path, plot_path = Path("runs") / f"{algorithm}_seed{seed}.json", Path("plots") / f"{algorithm}_seed{seed}.png"
         result.save(out / json_path)
         plot_run(result, out / plot_path)

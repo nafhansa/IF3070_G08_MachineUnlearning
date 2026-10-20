@@ -12,7 +12,11 @@ Repo ini berisi **baseline** (kode bersama). Ketiga algoritma masih stub dan dik
 
 | algoritma | file | pemilik |
 |---|---|---|
-| Hill Climbing | `src/algorithms/hill_climbing.py` | Nafhan |
+| Hill Climbing (stochastic, versi salindia) | `src/algorithms/hc_stochastic.py` | Nafhan |
+| Hill Climbing (sideways move) | `src/algorithms/hc_sideways.py` | Nafhan |
+| Hill Climbing (random restart) | `src/algorithms/hc_random_restart.py` | Nafhan |
+| Hill Climbing (stochastic, versi AIMA) | `src/algorithms/hc_stochastic_aima.py` | Nafhan |
+| Helper bersama Hill Climbing | `src/algorithms/hc_common.py`, `hc_variants.py` | Nafhan |
 | Simulated Annealing | `src/algorithms/simulated_annealing.py` | Kade |
 | Genetic Algorithm | `src/algorithms/genetic_algorithm.py` | Faris |
 
@@ -24,6 +28,18 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
+## Menjalankan eksperimen Hill Climbing
+
+```bash
+python -m src.main experiment --config configs/hc_experiment.json              # stochastic (salindia)
+python -m src.main experiment --config configs/hc_sideways_experiment.json     # sideways move
+python -m src.main experiment --config configs/hc_random_restart_experiment.json  # random restart
+python -m src.main experiment --config configs/hc_stochastic_aima_experiment.json # stochastic (AIMA)
+python -m src.main validate --config configs/problem.json --result output/<folder>/runs/<file>.json
+```
+
+Hasil tiap eksperimen ada di `output/<nama>/` (runs/, plots/, raw_results.csv, SUMMARY.md).
+
 ## Struktur
 
 ```text
@@ -34,7 +50,7 @@ src/result.py       RunResult + snapshot (format hasil bersama)
 src/baseline.py     random baseline + exact oracle (instance tiny)
 src/experiments.py  registry ALGORITHMS, runner eksperimen, plot
 src/main.py         CLI + validator hasil
-src/algorithms/     stub HC, SA, GA (isi di sini)
+src/algorithms/     hc_*.py (HC), simulated_annealing.py, genetic_algorithm.py
 tests/              test inti (core, search_space, baseline)
 ```
 
