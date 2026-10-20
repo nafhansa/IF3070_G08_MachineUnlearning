@@ -32,6 +32,7 @@ Urutan Pengerjaan:
 import random
 import time
 
+from src.algorithms.hc_common import check_integer_config
 from src.core import objective, problem_to_dict
 from src.result import RunResult, snapshot
 from src.search_space import describe_move, random_feasible_neighbor, random_feasible_state
@@ -39,12 +40,8 @@ from src.search_space import describe_move, random_feasible_neighbor, random_fea
 
 def hc_stochastic(problem, config, seed):
     # 1. Membaca dan memeriksa config
-    max_iterations = config["max_iterations"]
-
-    # True/False di Python dianggap angka juga (bool turunan int), jadi harus ditolak manual
-    is_valid_number = isinstance(max_iterations, int) and not isinstance(max_iterations, bool)
-    if not is_valid_number or max_iterations < 0:
-        raise ValueError("max_iterations harus integer >= 0")
+    # check_integer_config menolak bool, negatif, dan tipe selain integer
+    max_iterations = check_integer_config("max_iterations", config["max_iterations"], 0)
 
     # Kalau tidak diisi, snapshot disimpan (default True)
     save_snapshots = config.get("record_snapshots", True)
