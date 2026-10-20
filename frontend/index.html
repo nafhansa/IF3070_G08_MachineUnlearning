@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IF3070 Vehicle Loading Optimization</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>IF3070 Vehicle Loading Optimization</h1>
+      <p id="instance-info" class="muted">Belum ada hasil yang dimuat.</p>
+    </div>
+    <div class="topbar-actions">
+      <span id="status" class="badge badge-idle" role="status" aria-live="polite">belum ada run</span>
+      <button id="reset-btn" type="button">Reset ke demo</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="panel" aria-labelledby="algo-heading">
+        <h2 id="algo-heading">Algoritma</h2>
+        <div class="tabs" role="tablist" aria-label="Pilih algoritma">
+          <button type="button" role="tab" data-algo="hc" aria-selected="true">Hill Climbing</button>
+          <button type="button" role="tab" data-algo="sa" aria-selected="false">Simulated Annealing</button>
+          <button type="button" role="tab" data-algo="ga" aria-selected="false">Genetic Algorithm</button>
+        </div>
+        <p id="algo-summary" class="algo-summary"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="run-heading">
+        <h2 id="run-heading">Jalankan solver (Python)</h2>
+        <p id="run-offline" class="muted small" hidden>Mode statis: tombol Run butuh server.
+          Jalankan <code>python -m src.server</code> dari folder <code>work/</code>, lalu buka
+          <code>http://127.0.0.1:8000/</code>.</p>
+        <form id="run-form" hidden>
+          <label for="instance-select">Problem instance</label>
+          <select id="instance-select"></select>
+          <p id="instance-note" class="muted small"></p>
+          <label for="seed-input">Seed</label>
+          <input id="seed-input" type="number" min="0" step="1" value="1" required>
+          <div id="param-fields"></div>
+          <button id="run-btn" class="primary" type="submit">Run</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="load-heading">
+        <h2 id="load-heading">Muat hasil tersimpan</h2>
+        <label for="preset-select">Hasil run Python</label>
+        <div class="row">
+          <select id="preset-select"></select>
+          <button id="load-preset-btn" type="button">Muat</button>
+        </div>
+        <label for="file-input">atau pilih file RunResult JSON</label>
+        <input id="file-input" type="file" accept=".json,application/json">
+      </section>
+
+      <section class="panel" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Ringkasan run</h2>
+        <dl id="summary" class="summary"><dt>Status</dt><dd>belum ada hasil</dd></dl>
+      </section>
+
+      <section class="panel">
+        <details>
+          <summary>Cara kerja algoritma ini</summary>
+          <ol id="howto" class="howto"></ol>
+        </details>
+        <details>
+          <summary>Problem, objective, dan constraint</summary>
+          <p>Pilih kendaraan yang dimuat, beserta posisi <code>(x, y)</code> dan orientasinya di deck, untuk
+            <strong>memaksimalkan total ShippingFee</strong> kendaraan yang dimuat.</p>
+          <p>Hard constraint (dicek Python, bukan penalty): tidak ada overlap, seluruh kendaraan di dalam deck,
+            total berat ≤ MaxCapacity. Move: swap, relocate, rotate.</p>
+        </details>
+        <details>
+          <summary>Local optimum ≠ global optimum</summary>
+          <p>Local optimum: tidak ada satu move pun (swap/relocate/rotate) yang menaikkan objective. Belum tentu
+            global optimum. Angka terbaik di instance besar disebut <em>best-known</em>, bukan optimum terbukti.</p>
+          <p>Pada SA, <em>terminal</em> adalah state saat berhenti, sedangkan <em>best-found</em> adalah state terbaik
+            sepanjang run. Keduanya bisa berbeda.</p>
+        </details>
+      </section>
+    </aside>
+
+    <section class="content" aria-label="Visualisasi">
+      <div id="message" class="message" role="alert" hidden></div>
+
+      <div class="viewbar" role="group" aria-label="State yang ditampilkan">
+        <button type="button" data-view="frame" aria-pressed="true">Frame terpilih</button>
+        <button type="button" data-view="initial" aria-pressed="false">Initial</button>
+        <button type="button" data-view="final" aria-pressed="false">Final</button>
+        <button type="button" data-view="best" aria-pressed="false" hidden>Best-found (SA)</button>
+        <span id="view-label" class="muted"></span>
+      </div>
+
+      <div class="deck-row">
+        <figure class="deck-wrap">
+          <svg id="deck" role="img" aria-label="Deck kapal"></svg>
+          <figcaption id="deck-caption" class="muted">x ke kanan, y ke bawah, (0, 0) di pojok kiri atas.</figcaption>
+        </figure>
+        <div class="side-info">
+          <div id="stats" class="stats" aria-live="polite"></div>
+          <section class="panel">
+            <h3>Kenapa state ini?</h3>
+            <div id="explain" class="explain"><p class="muted">Muat hasil run untuk melihat keputusan per langkah.</p></div>
+          </section>
+          <section class="panel">
+            <h3>Detail kendaraan</h3>
+            <div id="vehicle-detail"><p class="muted">Klik atau fokus (Tab) kendaraan untuk melihat detail.</p></div>
+          </section>
+          <section class="panel">
+            <h3>Di luar kapal (<span id="outside-count">0</span>)</h3>
+            <ul id="outside-list" class="chips"></ul>
+          </section>
+        </div>
+      </div>
+
+      <section class="panel timeline" aria-label="Timeline">
+        <div class="timeline-buttons">
+          <button type="button" id="first-btn" aria-label="Frame pertama">⏮ Awal</button>
+          <button type="button" id="prev-btn" aria-label="Frame sebelumnya">◀ Prev</button>
+          <button type="button" id="play-btn">▶ Play</button>
+          <button type="button" id="next-btn" aria-label="Frame berikutnya">Next ▶</button>
+          <button type="button" id="last-btn" aria-label="Frame terakhir">Akhir ⏭</button>
+          <label for="speed-select">Kecepatan</label>
+          <select id="speed-select">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+          <span id="trace-badge" class="badge badge-warn" hidden></span>
+        </div>
+        <div class="slider-row">
+          <input id="frame-slider" type="range" min="0" max="0" value="0" aria-label="Pilih frame">
+          <output id="frame-label" for="frame-slider">-</output>
+        </div>
+        <p class="muted small">Keyboard: ← / → pindah frame, Home / End ke awal / akhir, Spasi untuk play/pause.</p>
+      </section>
+
+      <section id="charts" class="charts" aria-label="Grafik"></section>
+
+      <section class="panel history" aria-labelledby="history-heading">
+        <h2 id="history-heading">Riwayat hasil sesi ini (perbandingan)</h2>
+        <p class="muted small">Bandingkan hanya pada instance yang sama. Seed yang sama tidak berarti lintasan random yang
+          sama antar algoritma. Satu iterasi HC/SA tidak setara dengan satu generasi GA, jadi lihat juga jumlah evaluasi
+          objective dan runtime. Untuk SA, "final" adalah state terminal; best-found ditampilkan terpisah.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Algoritma</th><th>Instance</th><th>Seed</th><th>Parameter</th><th>Final</th>
+              <th>Best-found</th><th>Evaluasi objective</th><th>Runtime (s)</th><th>Sumber</th><th></th></tr></thead>
+            <tbody id="history-body"><tr><td colspan="11" class="muted">Belum ada hasil.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="runmodel.js"></script>
+  <script src="deck.js"></script>
+  <script src="charts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
