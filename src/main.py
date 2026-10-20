@@ -21,6 +21,10 @@ from src.result import RunResult
 from src.search_space import random_feasible_state
 
 
+# keluarga hill climbing: objective current tidak boleh turun
+HC_FAMILY = ("hc", "hc_sideways", "hc_random_restart", "hc_stochastic_aima")
+
+
 def check_result(result: RunResult, problem) -> list[str]:
     """hitung ulang objective/feasibility dari JSON hasil run secara independen dari angka tersimpan."""
     issues = []
@@ -63,7 +67,7 @@ def _check_local_search_history(result, problem) -> list[str]:
     """hc/sa: current_state null = sama dengan frame sebelumnya, jadi state direkonstruksi lalu objective
     tiap frame dihitung ulang. hc: objective tidak turun, panjang = nmax + 1. sa: lihat _check_sa_history."""
     issues, state, previous = [], None, None
-    key = "objective" if result.algorithm == "hc" else "current_objective"
+    key = "objective" if result.algorithm in HC_FAMILY else "current_objective"
     for h in result.history:
         if h["current_state"] is not None:
             state = state_from_dict(h["current_state"], problem)
@@ -72,11 +76,16 @@ def _check_local_search_history(result, problem) -> list[str]:
         value = h[key]
         if state is not None and objective(state, problem) != value:
             issues.append(f"iterasi {h['iteration']}: objective {value} != current state")
-        if result.algorithm == "hc" and previous is not None and value < previous:
+        # random restart: awal tiap restart adalah state baru, jadi pengecekan non-menurun mulai ulang
+        if result.algorithm == "hc_random_restart" and h["reason"] == "restart_initial":
+            previous = None
+        if result.algorithm in HC_FAMILY and previous is not None and value < previous:
             issues.append(f"iterasi {h['iteration']}: objective HC turun")
         previous = value
     if result.algorithm == "hc" and len(result.history) != result.config["max_iterations"] + 1:
         issues.append("panjang history != max_iterations + 1")
+    if result.algorithm == "hc_random_restart":
+        return issues + _check_random_restart_history(result, problem)
     final = state_from_dict(result.final_state, problem)
     if state is not None and state != final:
         issues.append("current state terakhir di history != final_state")
@@ -84,6 +93,32 @@ def _check_local_search_history(result, problem) -> list[str]:
         issues.append("objective iterasi terakhir != final_objective")
     if result.algorithm == "sa":
         issues += _check_sa_history(result, problem)
+    return issues
+
+
+def _check_random_restart_history(result, problem) -> list[str]:
+    """final_state adalah hasil terbaik antar restart (bukan frame terakhir): cek best-so-far monoton dan
+    sama dengan max objective sejauh ini, jumlah restart, nomor iterasi global, dan final = max peak."""
+    issues, m, best = [], result.metrics, None
+    expected_iteration = 0
+    for h in result.history:
+        if h["iteration"] != expected_iteration:
+            issues.append(f"iterasi {h['iteration']}: nomor iterasi global tidak berlanjut")
+        expected_iteration = h["iteration"] + 1
+        best = h["objective"] if best is None else max(best, h["objective"])
+        if h["best_so_far_objective"] != best:
+            issues.append(f"iterasi {h['iteration']}: best_so_far tidak sama dengan max objective sejauh ini")
+    restarts = {h["restart"] for h in result.history}
+    if len(restarts) != m["restarts"] or restarts != set(range(m["restarts"])):
+        issues.append("jumlah restart di history != metrics.restarts")
+    for name in ("iterations_per_restart", "restart_initial_objectives", "restart_final_objectives",
+                 "restart_termination_reasons"):
+        if len(m[name]) != m["restarts"]:
+            issues.append(f"panjang metrics.{name} != restarts")
+    if result.final_objective != max(m["restart_final_objectives"]):
+        issues.append("final_objective != max(restart_final_objectives)")
+    if result.final_objective != best:
+        issues.append("final_objective != best-so-far terakhir")
     return issues
 
 
