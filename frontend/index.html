@@ -27,6 +27,15 @@
           <button type="button" role="tab" data-algo="sa" aria-selected="false">Simulated Annealing</button>
           <button type="button" role="tab" data-algo="ga" aria-selected="false">Genetic Algorithm</button>
         </div>
+        <div id="variant-row" hidden>
+          <label for="variant-select">Varian Hill Climbing</label>
+          <select id="variant-select">
+            <option value="hc">Stochastic (salindia hlm. 29)</option>
+            <option value="hc_stochastic_aima">Stochastic (AIMA)</option>
+            <option value="hc_sideways">Sideways move</option>
+            <option value="hc_random_restart">Random restart</option>
+          </select>
+        </div>
         <p id="algo-summary" class="algo-summary"></p>
       </section>
 
