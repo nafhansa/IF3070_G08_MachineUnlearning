@@ -114,3 +114,56 @@ test("evaluationsOf dan bestOf membaca metrik yang benar per algoritma", () => {
   assert.equal(RM.bestOf(sa), sa.metrics.best_found_objective);
   assert.equal(RM.bestOf(hc), hc.final_objective);
 });
+
+// varian hill climbing: fixture kecil dari run python asli (instance tiny)
+const VARIANTS = ["hc_sideways", "hc_random_restart", "hc_stochastic_aima"];
+const variantRun = (name) => load(`frontend/tests/fixtures/${name}_tiny_seed5.json`);
+
+test("varian HC: validateRun, buildFrames, chart, penjelasan, dan ringkasan tidak error", () => {
+  for (const name of VARIANTS) {
+    const run = variantRun(name);
+    assert.doesNotThrow(() => RM.validateRun(run), name);
+    const frames = RM.buildFrames(run);
+    assert.equal(frames.length, run.history.length, name);
+    // random restart: frame terakhir = peak restart TERAKHIR, sedangkan final_state = peak TERBAIK antar restart
+    if (name !== "hc_random_restart") assert.equal(placementsKey(frames.at(-1).state), placementsKey(run.final_state), name);
+    for (const chart of RM.chartsFor(run)) {
+      for (const series of chart.series) assert.equal(series.values.length, run.history.length, `${name} ${series.name}`);
+    }
+    frames.forEach((_, i) => {
+      const lines = RM.explainFrame(run, frames, i);
+      assert.ok(lines.length > 0 && lines.every((l) => !l.includes("undefined")), `${name} frame ${i}: ${lines}`);
+    });
+    const rows = RM.summaryOf(run);
+    assert.ok(rows.every(([, v]) => v !== undefined && !String(v).includes("undefined")), name);
+    assert.equal(RM.evaluationsOf(run), run.metrics.objective_evaluations, name);
+  }
+});
+
+test("HC sideways: sideways move tercatat, state berubah tetapi objective sama", () => {
+  const run = variantRun("hc_sideways");
+  const frames = RM.buildFrames(run);
+  const i = run.history.findIndex((h) => h.sideways);
+  assert.ok(i > 0, "fixture harus punya sideways move");
+  assert.equal(run.history[i].objective, run.history[i - 1].objective);
+  const chart = RM.chartsFor(run)[0];
+  assert.ok(chart.series.find((s) => s.name === "sideways move").values[i] !== null);
+  assert.match(RM.explainFrame(run, frames, i)[0], /sideways/);
+});
+
+test("HC random restart: awal restart punya snapshot, best-so-far tidak pernah turun", () => {
+  const run = variantRun("hc_random_restart");
+  const starts = run.history.filter((h) => h.reason === "restart_initial");
+  assert.equal(starts.length, run.metrics.restarts);
+  assert.ok(starts.every((h) => h.current_state !== null));
+  const best = RM.chartsFor(run)[0].series.find((s) => s.name === "best-so-far").values;
+  best.forEach((v, i) => { if (i > 0) assert.ok(v >= best[i - 1]); });
+  assert.equal(RM.bestOf(run), run.metrics.best_found_objective);
+});
+
+test("HC AIMA: chart kedua memakai uphill_count", () => {
+  const run = variantRun("hc_stochastic_aima");
+  const charts = RM.chartsFor(run);
+  assert.equal(charts.length, 2);
+  assert.deepEqual(charts[1].series[0].values, run.history.map((h) => h.uphill_count));
+});

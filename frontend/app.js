@@ -29,6 +29,33 @@
         "Berhenti setelah nmax iterasi. Hasil bisa tertahan di local optimum atau plateau (slide 29).",
       ],
     },
+    hc_stochastic_aima: {
+      summary: "Stochastic HC versi buku AIMA: kumpulkan SEMUA uphill neighbor, lalu pilih satu di antaranya secara acak.",
+      steps: [
+        "Mulai dari state awal random yang feasible.",
+        "Tiap iterasi: nilai semua neighbor feasible, simpan yang lebih tinggi dari current (uphill).",
+        "Pilih satu uphill neighbor: 'proportional' (peluang sebanding kecuraman) atau 'uniform' (sama rata).",
+        "Berhenti bila tidak ada uphill neighbor (local optimum) atau mencapai batas iterasi.",
+      ],
+    },
+    hc_sideways: {
+      summary: "Steepest-ascent yang boleh pindah ke neighbor bernilai SAMA (sideways move) agar bisa melewati plateau.",
+      steps: [
+        "Mulai dari state awal random yang feasible.",
+        "Tiap iterasi: nilai semua neighbor, ambil nilai terbaik (yang seri dipilih acak).",
+        "Lebih baik dari current: pindah. Sama dengan current: pindah sebagai sideways move.",
+        "Berhenti bila neighbor terbaik lebih buruk (local optimum), sideways beruntun mencapai batas, atau iterasi habis.",
+      ],
+    },
+    hc_random_restart: {
+      summary: "Steepest-ascent diulang dari beberapa state awal acak. Hasil akhir adalah peak terbaik di antara semua restart.",
+      steps: [
+        "Tiap restart dimulai dari state awal random yang baru.",
+        "Naik dengan steepest-ascent: pindah ke neighbor terbaik sampai tidak ada yang lebih baik (peak).",
+        "Catat peak tiap restart; hasil terbaik hanya diganti bila STRICTLY lebih tinggi.",
+        "Grafik: objective current turun saat restart baru dimulai, sedangkan best-so-far tidak pernah turun.",
+      ],
+    },
     sa: {
       summary: "Seperti stochastic HC, tetapi move yang lebih buruk boleh diterima dengan peluang e^(ΔE/T) yang mengecil saat suhu turun.",
       steps: [
@@ -165,11 +192,16 @@
 
   // --- algoritma ------------------------------------------------------------------
 
+  // tab "hc" mewakili hc biasa dan semua variannya (hc_*); variannya dipilih lewat dropdown
+  const familyOf = (algo) => (algo.startsWith("hc") ? "hc" : algo);
+
   function selectAlgorithm(algo, refillPresets = true) {
     ui.algorithm = algo;
     for (const tab of document.querySelectorAll("[data-algo]")) {
-      tab.setAttribute("aria-selected", String(tab.dataset.algo === algo));
+      tab.setAttribute("aria-selected", String(tab.dataset.algo === familyOf(algo)));
     }
+    $("variant-row").hidden = familyOf(algo) !== "hc";
+    $("variant-select").value = familyOf(algo) === "hc" ? algo : "hc";
     $("algo-summary").textContent = HOWTO[algo].summary;
     const list = $("howto");
     while (list.firstChild) list.removeChild(list.firstChild);
@@ -205,6 +237,22 @@
         box.appendChild(label);
         continue;
       }
+      if (spec.type === "choice") {
+        const select = document.createElement("select");
+        select.id = id;
+        select.dataset.key = spec.key;
+        select.dataset.type = spec.type;
+        for (const option of spec.options) {
+          const opt = document.createElement("option");
+          opt.value = option;
+          opt.textContent = option;
+          select.appendChild(opt);
+        }
+        select.value = spec.default;
+        label.textContent = spec.label;
+        box.append(label, select);
+        continue;
+      }
       input.type = "number";
       input.min = String(spec.min);
       input.max = String(spec.max);
@@ -228,17 +276,17 @@
   async function runSolver(event) {
     event.preventDefault();
     const config = {};
-    for (const input of $("param-fields").querySelectorAll("input")) {
+    for (const input of $("param-fields").querySelectorAll("input, select")) {
       const type = input.dataset.type;
-      config[input.dataset.key] = type === "bool" ? input.checked : type === "int" ? Number.parseInt(input.value, 10) :
-        Number.parseFloat(input.value);
+      config[input.dataset.key] = type === "bool" ? input.checked : type === "choice" ? input.value :
+        type === "int" ? Number.parseInt(input.value, 10) : Number.parseFloat(input.value);
     }
     const body = { algorithm: ui.algorithm, instance: $("instance-select").value,
       seed: Number.parseInt($("seed-input").value, 10), config };
     const button = $("run-btn");
     button.disabled = true;
     const started = performance.now();
-    setStatus(`menjalankan ${ui.algorithm.toUpperCase()} di Python…`, "running");
+    setStatus(`menjalankan ${RM.ALGORITHMS[ui.algorithm].name} di Python…`, "running");
     showMessage("Solver sedang berjalan di Python. Hasil baru tampil setelah response diterima.", "info");
     try {
       const resp = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -317,7 +365,10 @@
     }
     if (ui.view === "final") {
       const label = { hc: "Final: current terakhir (= terbaik untuk HC)", sa: "Final: TERMINAL current (state saat SA berhenti)",
-        ga: "Final: best-found sepanjang semua generasi" }[run.algorithm];
+        ga: "Final: best-found sepanjang semua generasi",
+        hc_stochastic_aima: "Final: current terakhir (= terbaik untuk HC)",
+        hc_sideways: "Final: current saat berhenti (sideways move tidak menurunkan nilai)",
+        hc_random_restart: "Final: peak terbaik di antara semua restart" }[run.algorithm];
       return { state: run.final_state, label };
     }
     if (ui.view === "best") {
@@ -484,6 +535,7 @@
     for (const tab of document.querySelectorAll("[data-algo]")) {
       tab.addEventListener("click", () => selectAlgorithm(tab.dataset.algo));
     }
+    $("variant-select").addEventListener("change", (event) => selectAlgorithm(event.target.value));
     for (const b of document.querySelectorAll("[data-view]")) {
       b.addEventListener("click", () => { ui.view = b.dataset.view; render(); });
     }

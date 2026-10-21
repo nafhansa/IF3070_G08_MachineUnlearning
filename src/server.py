@@ -2,8 +2,8 @@
 
     python -m src.server            # http://127.0.0.1:8000
 
-server bukan solver keempat: ia hanya memvalidasi request, memanggil ALGORITHMS[...] dari
-src.experiments, lalu mengembalikan RunResult apa adanya. tidak ada path dari user yang dibuka langsung;
+server bukan solver keempat: ia hanya memvalidasi request, memanggil SOLVERS[...] (ALGORITHMS dari
+src.experiments + HC_VARIANTS), lalu mengembalikan RunResult apa adanya. tidak ada path dari user yang dibuka langsung;
 instance dan file hasil hanya dari whitelist.
 """
 
@@ -16,9 +16,13 @@ from pathlib import Path
 
 from flask import Flask, abort, jsonify, request, send_from_directory
 
+from src.algorithms.hc_variants import HC_VARIANTS
 from src.baseline import exact_optimum
 from src.core import load_problem
 from src.experiments import ALGORITHMS
+
+# solver yang boleh dipanggil dari browser: tiga algoritma utama + varian hill climbing
+SOLVERS = {**ALGORITHMS, **HC_VARIANTS}
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
@@ -33,13 +37,31 @@ INSTANCES = {
 }
 
 # folder hasil run python yang boleh dibaca frontend (hanya file .json di dalamnya)
-RESULT_DIRS = ("hill_climbing/runs", "simulated_annealing/runs", "genetic_algorithm/runs", "demo")
+RESULT_DIRS = ("hill_climbing/runs", "hc_sideways/runs", "hc_random_restart/runs", "hc_stochastic_aima/runs",
+               "simulated_annealing/runs", "genetic_algorithm/runs", "demo")
 
 # satu-satunya sumber parameter + batas aman untuk browser. batas ini sengaja lebih kecil dari CLI agar
 # satu request tidak membekukan UI; eksperimen resmi tetap lewat CLI tanpa batas ini.
 PARAM_SPECS = {
     "hc": [
         {"key": "max_iterations", "label": "nmax (iterasi)", "type": "int", "min": 0, "max": 20000, "default": 2000},
+    ],
+    # varian HC memeriksa SEMUA neighbor tiap langkah (sekitar 0,05 s per langkah di instance standar),
+    # jadi batas browsernya jauh lebih kecil dari hc biasa. CLI tetap tanpa batas ini.
+    "hc_sideways": [
+        {"key": "max_sideways", "label": "maks sideways beruntun", "type": "int", "min": 0, "max": 300,
+         "default": 50},
+        {"key": "max_iterations", "label": "iterasi maksimum", "type": "int", "min": 0, "max": 300, "default": 100},
+    ],
+    "hc_random_restart": [
+        {"key": "max_restarts", "label": "jumlah restart", "type": "int", "min": 1, "max": 10, "default": 3},
+        {"key": "iterations_per_restart", "label": "batas langkah per restart", "type": "int", "min": 0, "max": 50,
+         "default": 30},
+    ],
+    "hc_stochastic_aima": [
+        {"key": "max_iterations", "label": "iterasi maksimum", "type": "int", "min": 0, "max": 300, "default": 100},
+        {"key": "selection", "label": "cara memilih uphill neighbor", "type": "choice",
+         "options": ["proportional", "uniform"], "default": "proportional"},
     ],
     "sa": [
         {"key": "max_iterations", "label": "iterasi maksimum", "type": "int", "min": 0, "max": 6000, "default": 3000},
@@ -76,8 +98,8 @@ def parse_run_request(body) -> tuple[str, str, int, dict]:
     if not isinstance(body, dict):
         raise BadRequest("body harus objek JSON")
     algorithm = body.get("algorithm")
-    if algorithm not in ALGORITHMS:
-        raise BadRequest(f"algorithm harus salah satu dari {sorted(ALGORITHMS)}")
+    if algorithm not in SOLVERS:
+        raise BadRequest(f"algorithm harus salah satu dari {sorted(SOLVERS)}")
     instance = body.get("instance")
     if instance not in INSTANCES:
         raise BadRequest(f"instance harus salah satu dari {sorted(INSTANCES)}")
@@ -97,6 +119,9 @@ def parse_run_request(body) -> tuple[str, str, int, dict]:
         if spec["type"] == "bool":
             if not isinstance(value, bool):
                 raise BadRequest(f"{key} harus true/false")
+        elif spec["type"] == "choice":
+            if value not in spec["options"]:
+                raise BadRequest(f"{key} harus salah satu dari {spec['options']}")
         else:
             ok_type = _is_int(value) if spec["type"] == "int" else _is_int(value) or isinstance(value, float)
             if not ok_type or not spec["min"] <= value <= spec["max"]:
@@ -133,7 +158,8 @@ def _list_results() -> list[dict]:
             # algoritma diambil dari nama folder/file agar json besar (sampai ~6 MB) tidak perlu dibuka
             name = path.name
             algorithm = ("hc" if folder.startswith("hill") else "sa" if folder.startswith("simulated") else
-                         "ga" if folder.startswith("genetic") else name.split("_")[0])
+                         "ga" if folder.startswith("genetic") else
+                         folder.split("/")[0] if folder.startswith("hc_") else name.split("_")[0])
             items.append({"id": f"{folder}/{name}", "algorithm": algorithm, "label": f"{folder}/{name}"})
     return items
 
@@ -161,7 +187,7 @@ def create_app() -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ok", algorithms=sorted(ALGORITHMS))
+        return jsonify(status="ok", algorithms=sorted(SOLVERS))
 
     @app.get("/api/instances")
     def instances():
@@ -180,7 +206,7 @@ def create_app() -> Flask:
         algorithm, instance, seed, config = parse_run_request(body)
         problem = load_problem(INSTANCES[instance]["path"])
         # pemanggilan solver yang sama persis dengan CLI; error tak terduga dibiarkan jadi 500 + traceback di log
-        result = ALGORITHMS[algorithm](problem, config, seed)
+        result = SOLVERS[algorithm](problem, config, seed)
         return jsonify(result.to_dict())
 
     @app.get("/api/results")

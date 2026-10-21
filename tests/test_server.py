@@ -24,6 +24,9 @@ SMALL = {
     "sa": {"max_iterations": 40, "initial_temperature": 20.0, "cooling_rate": 0.95, "min_temperature": 0.1,
            "detect_stuck": True},
     "ga": {"population_size": 6, "generations": 4, "crossover_rate": 0.9, "mutation_rate": 0.2, "elite_count": 1},
+    "hc_sideways": {"max_sideways": 5, "max_iterations": 10},
+    "hc_random_restart": {"max_restarts": 2, "iterations_per_restart": 5},
+    "hc_stochastic_aima": {"max_iterations": 10, "selection": "uniform"},
 }
 
 
@@ -45,12 +48,12 @@ def test_instances_are_whitelisted_presets(client):
 
 def test_algorithm_specs_cover_all_algorithms(client):
     specs = client.get("/api/algorithms").get_json()
-    assert set(specs) == {"hc", "sa", "ga"}
+    assert set(specs) == {"hc", "sa", "ga", "hc_sideways", "hc_random_restart", "hc_stochastic_aima"}
     for algo, params in specs.items():
         assert all({"key", "label", "type", "default"} <= set(p) for p in params), algo
 
 
-@pytest.mark.parametrize("algorithm", ["hc", "sa", "ga"])
+@pytest.mark.parametrize("algorithm", list(SMALL))
 @pytest.mark.parametrize("instance", ["tiny", "standard"])
 def test_run_returns_valid_reproducible_result(client, algorithm, instance):
     first = run(client, algorithm=algorithm, instance=instance, seed=7, config=SMALL[algorithm])
@@ -61,6 +64,13 @@ def test_run_returns_valid_reproducible_result(client, algorithm, instance):
     assert check_result(result, problem) == []  # objective dan feasibility dihitung ulang dari state
     again = RunResult(**run(client, algorithm=algorithm, instance=instance, seed=7, config=SMALL[algorithm]).get_json())
     assert again.history == result.history and again.final_state == result.final_state
+
+
+def test_hc_variant_rejects_bad_choice_and_unknown_param(client):
+    bad_choice = run(client, algorithm="hc_stochastic_aima", instance="tiny", seed=1, config={"selection": "x"})
+    assert bad_choice.status_code == 400 and "selection" in bad_choice.get_json()["error"]
+    unknown = run(client, algorithm="hc_sideways", instance="tiny", seed=1, config={"max_restarts": 2})
+    assert unknown.status_code == 400 and "max_restarts" in unknown.get_json()["error"]
 
 
 def test_run_uses_spec_defaults_when_config_omitted(client):

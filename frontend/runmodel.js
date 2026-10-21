@@ -6,9 +6,15 @@
 
   const ALGORITHMS = {
     hc: { name: "Stochastic Hill Climbing", axis: "iterasi" },
+    hc_stochastic_aima: { name: "Stochastic Hill Climbing (AIMA)", axis: "iterasi" },
+    hc_sideways: { name: "Hill Climbing Sideways Move", axis: "iterasi" },
+    hc_random_restart: { name: "Hill Climbing Random Restart", axis: "iterasi" },
     sa: { name: "Simulated Annealing", axis: "iterasi" },
     ga: { name: "Genetic Algorithm", axis: "generasi" },
   };
+
+  // hc biasa dan semua variannya (hc_*) berbagi bentuk history dasar yang sama
+  const isHc = (run) => run.algorithm === "hc" || run.algorithm.startsWith("hc_");
 
   // cek bentuk minimum supaya UI tidak menggambar data rusak seolah sah
   function validateRun(run) {
@@ -52,6 +58,51 @@
   function chartsFor(run) {
     const h = run.history;
     const pick = (key) => h.map((x) => x[key]);
+    if (run.algorithm === "hc_random_restart") {
+      return [{
+        title: "Objective current per restart dan best-so-far (current turun saat restart baru)",
+        yLabel: "total ShippingFee",
+        series: [
+          { name: "current objective", values: pick("objective"), kind: "line", color: "var(--c-current)" },
+          { name: "best-so-far", values: pick("best_so_far_objective"), kind: "line", color: "var(--c-best)",
+            dashed: true },
+          { name: "awal restart", values: h.map((x) => (x.reason === "restart_initial" ? x.objective : null)),
+            kind: "dot", color: "var(--c-stuck)" },
+        ],
+      }];
+    }
+    if (run.algorithm === "hc_sideways") {
+      return [{
+        title: "Objective current (naik, atau tetap saat sideways move)",
+        yLabel: "total ShippingFee",
+        series: [
+          { name: "current objective", values: pick("objective"), kind: "line", color: "var(--c-current)" },
+          { name: "improvement diterima", values: h.map((x) => (x.improved ? x.objective : null)), kind: "dot",
+            color: "var(--c-accept)" },
+          { name: "sideways move", values: h.map((x) => (x.sideways ? x.objective : null)), kind: "dot",
+            color: "var(--c-stuck)" },
+        ],
+      }];
+    }
+    if (run.algorithm === "hc_stochastic_aima") {
+      return [
+        {
+          title: "Objective current (HC tidak pernah turun)",
+          yLabel: "total ShippingFee",
+          series: [
+            { name: "current objective", values: pick("objective"), kind: "line", color: "var(--c-current)" },
+            { name: "improvement diterima", values: h.map((x) => (x.accepted ? x.objective : null)), kind: "dot",
+              color: "var(--c-accept)" },
+          ],
+        },
+        {
+          title: "Jumlah uphill neighbor yang tersedia per iterasi",
+          yLabel: "jumlah neighbor",
+          yMin: 0,
+          series: [{ name: "uphill neighbor", values: pick("uphill_count"), kind: "line", color: "var(--c-temp)" }],
+        },
+      ];
+    }
     if (run.algorithm === "hc") {
       return [{
         title: "Objective current (HC tidak pernah turun)",
@@ -115,6 +166,34 @@
 
   const fmt = (v, digits = 3) => (v === null || v === undefined ? "-" : Number.isInteger(v) ? String(v) : v.toFixed(digits));
 
+  // varian hc memilih dari SEMUA neighbor (bukan satu kandidat acak), jadi kalimatnya berbeda dari hc biasa
+  function explainHcVariant(run, h, move) {
+    const where = run.algorithm === "hc_random_restart" ? `Restart ${h.restart + 1}, langkah ${h.iteration}` :
+      `Iterasi ${h.iteration}`;
+    const lines = [];
+    if (h.reason === "improved") {
+      if (run.algorithm === "hc_stochastic_aima") {
+        const how = run.config.selection === "uniform" ? "sama rata" : "sebanding dengan kecuramannya";
+        lines.push(`${where}: ada ${h.uphill_count} uphill neighbor. Satu dipilih acak (${how}): ${move}, ` +
+          `bernilai ${fmt(h.candidate_objective)}, jadi pindah.`);
+      } else {
+        lines.push(`${where}: neighbor terbaik (${move}) bernilai ${fmt(h.candidate_objective)} > current, jadi pindah.`);
+      }
+    } else if (h.reason === "sideways") {
+      lines.push(`${where}: neighbor terbaik (${move}) bernilai sama (${fmt(h.candidate_objective)}). ` +
+        "Ini sideways move: pindah walau tidak membaik.");
+    } else if (h.reason === "max_sideways") {
+      lines.push(`${where}: neighbor terbaik bernilai sama, tapi batas sideways beruntun sudah tercapai. Berhenti.`);
+    } else if (h.reason === "local_optimum") {
+      const ending = run.algorithm === "hc_random_restart" ? "restart ini selesai" : "berhenti";
+      lines.push(`${where}: tidak ada neighbor yang lebih baik dari current. Sudah di peak (local optimum), ${ending}.`);
+    } else {
+      lines.push(`${where}: ${h.reason}.`);
+    }
+    lines.push(`Objective current: ${fmt(h.objective)}.`);
+    return lines;
+  }
+
   // kalimat penjelasan keputusan pada frame i, langsung dari field history
   function explainFrame(run, frames, i) {
     const h = frames[i].entry;
@@ -127,8 +206,13 @@
         "Deck menampilkan individu terbaik pada generasi ini (bukan seluruh populasi dan bukan 'current state').",
       ];
     }
+    if (run.algorithm === "hc_random_restart" && h.reason === "restart_initial") {
+      return [`Restart ${h.restart + 1}: state awal random baru yang feasible, objective ${fmt(h.objective)}.`,
+        `Best-so-far dari semua restart: ${fmt(h.best_so_far_objective)}.`];
+    }
     if (i === 0) return ["Iterasi 0: state awal random yang feasible."];
     const move = formatMove(h.move);
+    if (isHc(run) && run.algorithm !== "hc") return explainHcVariant(run, h, move);
     if (run.algorithm === "hc") {
       const lines = {
         improved: `Candidate (${move}) bernilai ${fmt(h.candidate_objective)} > current sebelumnya, jadi diterima.`,
@@ -176,7 +260,8 @@
       ["Runtime search", `${run.runtime_seconds.toFixed(3)} s`],
       ["Objective awal", run.initial_objective],
       [run.algorithm === "sa" ? "Objective terminal (final)" : run.algorithm === "ga" ? "Objective best-found (final)" :
-        "Objective final", run.final_objective],
+        run.algorithm === "hc_random_restart" ? "Objective final (terbaik antar restart)" : "Objective final",
+        run.final_objective],
       ["Final feasible (backend)", run.final_state.feasible ? "ya" : "TIDAK"],
     ];
     if (run.algorithm === "sa") {
@@ -186,6 +271,21 @@
     }
     if (run.algorithm === "hc") {
       rows.push(["Improvement / tolak equal / tolak worse", `${m.improvements} / ${m.rejected_equal} / ${m.rejected_worse}`]);
+    }
+    if (run.algorithm === "hc_sideways") {
+      rows.push(["Improvement", m.improvements]);
+      rows.push(["Sideways total / maks beruntun", `${m.sideways_moves_total} / ${m.max_consecutive_sideways}`]);
+      rows.push(["Berhenti karena", `${m.termination_reason} setelah ${m.iterations} iterasi`]);
+    }
+    if (run.algorithm === "hc_stochastic_aima") {
+      rows.push(["Improvement", m.improvements]);
+      rows.push(["Cara memilih uphill neighbor", m.selection]);
+      rows.push(["Berhenti karena", `${m.termination_reason} setelah ${m.iterations} iterasi`]);
+    }
+    if (run.algorithm === "hc_random_restart") {
+      rows.push(["Restart", m.restarts]);
+      rows.push(["Restart terbaik", `ke-${m.best_restart_index + 1} (objective ${m.best_found_objective})`]);
+      rows.push(["Total langkah", m.total_iterations]);
     }
     if (run.algorithm === "ga") rows.push(["Evaluasi fitness", m.fitness_evaluations]);
     return rows;
@@ -203,7 +303,7 @@
     return run.algorithm === "sa" ? run.metrics.best_found_objective : run.final_objective;
   }
 
-  const api = { ALGORITHMS, validateRun, buildFrames, chartsFor, formatMove, explainFrame, vehicleColor, summaryOf,
+  const api = { ALGORITHMS, isHc, validateRun, buildFrames, chartsFor, formatMove, explainFrame, vehicleColor, summaryOf,
     evaluationsOf, bestOf };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.RunModel = api;
