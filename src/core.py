@@ -95,7 +95,7 @@ class Problem:
         return self._index[vehicle_id]
 
 
-# --- geometri ------------------------------------------------------------------
+# geometri 
 
 def footprint(vehicle: Vehicle, placement: Placement) -> tuple[int, int]:
     """ukuran efektif (w, l) di deck sesuai orientasi; Vehicle asli tidak diubah."""
@@ -120,7 +120,7 @@ def overlaps(a, b) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
-# --- state, constraint, objective --------------------------------------------
+# state, constraint, objective 
 
 def validate_state(state, problem: Problem) -> None:
     """cek struktur state (bukan constraint): panjang, tipe, koordinat integer, orientasi."""
@@ -181,7 +181,7 @@ def is_feasible(state, problem: Problem) -> bool:
     return not constraint_violations(state, problem)
 
 
-# --- serialisasi ----------------------------------------------------------------
+# serialisasi 
 
 def problem_from_dict(data: dict) -> Problem:
     ship = data["ship"]

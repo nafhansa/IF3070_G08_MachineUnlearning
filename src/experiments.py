@@ -29,7 +29,7 @@ from src.core import Problem, Ship, Vehicle, load_problem  # noqa: E402
 ALGORITHMS = {"ga": genetic_algorithm, "hc": hc_stochastic, "sa": simulated_annealing}
 
 
-# --- instance sintetis ------------------------------------------------------------
+# instance sintetis 
 
 def make_synthetic_problem(seed: int, n_vehicles: int = 30, ship=(10, 20, 500)) -> Problem:
     """instance demo ber-seed (BUKAN dataset resmi). default kapal mengikuti contoh spek:
@@ -49,7 +49,7 @@ def make_synthetic_problem(seed: int, n_vehicles: int = 30, ship=(10, 20, 500)) 
                    metadata={"source": "synthetic/demo instance (bukan data resmi)", "generator": params})
 
 
-# --- matriks run ----------------------------------------------------------------
+# matriks run 
 
 def _check_group(name, values, seeds):
     if len(values) != 3 or len(set(values)) != 3:
@@ -76,7 +76,7 @@ def build_runs(config: dict) -> list[dict]:
     return runs
 
 
-# --- plot -------------------------------------------------------------------------
+# plot 
 
 def draw_deck(ax, state: dict, problem: dict, title: str) -> None:
     """gambar deck: x = kolom (kanan), y = baris (bawah), (0,0) pojok kiri atas."""
@@ -223,7 +223,7 @@ def plot_group(experiment, grouped, path) -> None:
     plt.close(fig)
 
 
-# --- runner -----------------------------------------------------------------------
+# runner 
 
 def _summary_rows(rows):
     groups = {}

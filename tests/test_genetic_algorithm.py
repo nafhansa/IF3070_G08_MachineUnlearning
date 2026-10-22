@@ -39,7 +39,7 @@ class FixedRandom:
         return self.ints.pop(0)
 
 
-# --- roulette wheel ----------------------------------------------------------
+# oulette wheel
 
 def test_roulette_intervals_follow_slide_example():
     # slide 46: fitness 24, 23, 20, 11 (total 78) -> interval kumulatif [0,24) [24,47) [47,67) [67,78)
@@ -72,7 +72,7 @@ def test_roulette_distribution_is_fitness_proportional():
         assert abs(counts[i] / n - f / 78) < 0.015
 
 
-# --- crossover -----------------------------------------------------------------
+# crossover 
 
 def test_one_point_crossover_takes_prefix_and_suffix():
     p1, p2 = tuple("AAAAA"), tuple("BBBBB")
@@ -97,7 +97,7 @@ def test_crossover_keeps_length_and_vehicle_mapping(tiny_problem):
         assert all(c in (a, b) for c, a, b in zip(child, p1, p2))
 
 
-# --- mutation & repair ---------------------------------------------------------
+#  mutation & repair 
 
 def test_mutate_changes_child_without_touching_parent(tiny_problem):
     rng = random.Random(2)
@@ -145,7 +145,7 @@ def test_repair_relocates_before_unloading():
     assert status == "repaired" and all(p.loaded for p in fixed)
 
 
-# --- satu generasi -------------------------------------------------------------
+# satu generasi 
 
 def population_of(problem, n, seed):
     rng = random.Random(seed)
@@ -183,7 +183,7 @@ def test_mutation_rate_is_per_child(tiny_problem):
             assert all(child in pop for child in new)
 
 
-# --- run lengkap ---------------------------------------------------------------
+# run lengkap 
 
 def run_tiny(problem, seed=11, **overrides):
     cfg = dict(population_size=9, generations=15)
@@ -262,7 +262,7 @@ def test_invalid_config_is_rejected(tiny_problem, bad):
         genetic_algorithm(tiny_problem, bad, 0)
 
 
-# --- result schema ---------------------------------------------------------------
+# result schema 
 
 def test_run_result_json_round_trip(tmp_path, tiny_problem):
     result = run_tiny(tiny_problem)

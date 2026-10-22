@@ -1,0 +1,4 @@
+algorithm,seed,initial_objective,final_objective,best_found_objective,final_total_weight,final_loaded_count,iterations,runtime_seconds,stuck_event_count,local_optimum_check_seconds,json_path,plot_path
+hc_stochastic_aima,3401,720,865,865,494,16,7,0.5528,,0.0,runs/hc_stochastic_aima_seed3401.json,plots/hc_stochastic_aima_seed3401.png
+hc_stochastic_aima,3402,642,799,799,496,16,9,0.7345,,0.0,runs/hc_stochastic_aima_seed3402.json,plots/hc_stochastic_aima_seed3402.png
+hc_stochastic_aima,3403,592,961,961,478,16,13,0.9697,,0.0,runs/hc_stochastic_aima_seed3403.json,plots/hc_stochastic_aima_seed3403.png

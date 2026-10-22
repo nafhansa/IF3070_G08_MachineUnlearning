@@ -28,7 +28,7 @@ def _replace(state, changes: dict):
     return tuple(changes.get(i, p) for i, p in enumerate(state))
 
 
-# --- move dasar (tidak mengecek feasibility) ------------------------------------
+# move dasar (tidak mengecek feasibility) 
 
 def _normalized(problem, i: int, p: Placement) -> Placement:
     # persegi selalu "H": footprint H dan V identik, jadi cukup satu representasi
@@ -79,7 +79,7 @@ def _fits(problem, state, changed) -> bool:
     return True
 
 
-# --- initial state ---------------------------------------------------------------
+# initial state 
 
 def random_feasible_state(problem, rng, tries_per_vehicle: int = 20):
     """state awal random yang selalu feasible.
@@ -112,7 +112,7 @@ def random_feasible_state(problem, rng, tries_per_vehicle: int = 20):
     return tuple(state)
 
 
-# --- random move / neighbor -------------------------------------------------------
+# random move / neighbor 
 
 def _random_candidate(state, problem, rng):
     """satu percobaan move random. return (move, candidate, changed) atau None bila no-op."""

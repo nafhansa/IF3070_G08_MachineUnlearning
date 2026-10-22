@@ -23,7 +23,7 @@ from src.core import (
 from tests.conftest import at, make_state
 
 
-# --- objective -------------------------------------------------------------
+# objective
 
 def test_objective_counts_only_loaded_fee(tiny_problem):
     # fixture sanity dari panduandebug: loaded 100 + 30, unloaded 80 diabaikan
@@ -45,7 +45,7 @@ def test_unloaded_vehicle_has_no_weight_or_footprint(tiny_problem):
     assert is_feasible(state, tiny_problem)
 
 
-# --- geometri ---------------------------------------------------------------
+# geometri 
 
 def test_rotation_transposes_footprint_without_changing_vehicle(tiny_problem):
     a = tiny_problem.vehicles[0]
@@ -84,7 +84,7 @@ def test_partial_and_full_overlap_are_invalid(tiny_problem):
         assert any("overlap" in v for v in constraint_violations(state, tiny_problem))
 
 
-# --- kapasitas --------------------------------------------------------------
+# kapasitas
 
 def test_capacity_exactly_at_limit_is_valid(tiny_problem):
     state = make_state(tiny_problem, A=at(0, 0), B=at(2, 0), C=at(2, 2, "V"))
@@ -110,7 +110,7 @@ def test_float_capacity_uses_small_explicit_tolerance():
     assert not is_feasible(make_state(over, X=at(0, 0)), over)
 
 
-# --- validasi state ---------------------------------------------------------
+# validasi state
 
 def test_state_with_wrong_length_is_rejected(tiny_problem):
     with pytest.raises(ValueError):
@@ -135,7 +135,7 @@ def test_malformed_placement_is_rejected(tiny_problem, placement):
     assert not is_feasible(state, tiny_problem)
 
 
-# --- validasi problem -------------------------------------------------------
+# validasi problem 
 
 @pytest.mark.parametrize(
     "vehicle",
@@ -166,7 +166,7 @@ def test_duplicate_vehicle_id_is_rejected():
         Problem(Ship(4, 4, 10), (Vehicle("A", 1, 1, 1, 1, 0), Vehicle("A", 1, 1, 2, 1, 0)))
 
 
-# --- serialisasi ------------------------------------------------------------
+# serialisasi
 
 def test_state_dict_round_trip(tiny_problem):
     state = make_state(tiny_problem, A=at(0, 0), C=at(2, 2, "V"))

@@ -17,7 +17,7 @@ def ids(problem, state):
     return {v.id: p for v, p in zip(problem.vehicles, state)}
 
 
-# --- move dasar -------------------------------------------------------------
+# move dasar 
 
 def test_swap_inside_outside_exchanges_slot(tiny_problem):
     state = make_state(tiny_problem, A=at(0, 0))
@@ -77,7 +77,7 @@ def test_moves_do_not_mutate_input(tiny_problem):
     assert state == before
 
 
-# --- neighborhood exhaustive ---------------------------------------------------
+# neighborhood exhaustive 
 
 def naive_neighbors(state, problem):
     """enumerasi independen: semua move tanpa cek incremental, lalu filter is_feasible penuh."""
@@ -129,7 +129,7 @@ def test_neighbors_are_lazy(tiny_problem):
     assert next(gen) is not None
 
 
-# --- random ----------------------------------------------------------------
+# random 
 
 def test_random_feasible_state_is_feasible_and_seeded(tiny_problem):
     states = [random_feasible_state(tiny_problem, random.Random(s)) for s in range(50)]
@@ -199,7 +199,7 @@ def test_swap_normalizes_square_orientation():
     assert after[0] == UNLOADED
 
 
-# --- describe_move (tahap 2: nama move untuk history HC/SA) ---------------------
+# describe_move (tahap 2: nama move untuk history HC/SA) 
 
 def test_describe_move_matches_generator_moves(tiny_problem):
     from src.search_space import describe_move

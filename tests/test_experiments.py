@@ -85,7 +85,7 @@ def test_run_experiments_writes_all_outputs(tmp_path):
     assert (out / "SUMMARY.md").exists()
 
 
-# --- CLI ------------------------------------------------------------------------
+# CLI
 
 def test_cli_generate_validate_ga_and_pending_algorithms(tmp_path, capsys):
     from src.main import main
@@ -136,7 +136,7 @@ def test_cli_validate_reports_malformed_result_without_crashing(tmp_path, capsys
     assert "INVALID" in capsys.readouterr().out
 
 
-# --- tahap 2: hill climbing lewat CLI dan runner eksperimen ------------------------
+# tahap 2: hill climbing lewat CLI dan runner eksperimen 
 
 def make_problem_file(tmp_path, seed=3, vehicles=8):
     from src.main import main
@@ -195,7 +195,7 @@ def test_local_search_experiment_requires_unique_seeds(tmp_path):
         run_experiments(config_path)
 
 
-# --- tahap 2: simulated annealing lewat CLI dan runner eksperimen ---------------------
+# tahap 2: simulated annealing lewat CLI dan runner eksperimen 
 
 SA_ARGS = ["--iterations", "150", "--t0", "50", "--alpha", "0.97", "--min-temp", "0.05"]
 
