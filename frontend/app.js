@@ -174,18 +174,18 @@
     selectAlgorithm(data.algorithm, false);
     const p = data.problem;
     $("instance-info").textContent =
-      `${p.name || "problem"} | ${p.vehicles.length} kendaraan, deck ${p.ship.width}×${p.ship.length}, ` +
-      `MaxCapacity ${p.ship.max_capacity} | sumber: ${(p.metadata && p.metadata.source) || "-"} | file: ${source}`;
+      `${p.name || "problem"} · ${p.vehicles.length} kendaraan · deck ${p.ship.width}×${p.ship.length} · ` +
+      `kapasitas ${p.ship.max_capacity}`;
     const slider = $("frame-slider");
     slider.max = String(ui.frames.length - 1);
     $("trace-badge").hidden = data.config.record_snapshots !== false;
-    $("trace-badge").textContent = "snapshot tidak lengkap: frame tengah tanpa state";
+    $("trace-badge").textContent = "sebagian frame tanpa snapshot";
     document.querySelector('[data-view="best"]').hidden = data.algorithm !== "sa";
     renderSummary();
     renderCharts();
     renderHistory();
     setStatus("hasil dimuat", "ok");
-    showMessage(data.final_state.feasible ? "" : "PERINGATAN: final state ditandai TIDAK feasible oleh backend.",
+    showMessage(data.final_state.feasible ? "" : "Peringatan: solusi akhir tidak valid.",
       data.final_state.feasible ? "info" : "error");
     render();
   }
@@ -267,10 +267,9 @@
   function renderInstanceNote() {
     const info = ui.instances.find((i) => i.id === $("instance-select").value);
     if (!info) return;
-    const opt = info.exact_optimum === null ? "optimum tidak diketahui (best-known saja)" :
-      `optimum exact = ${info.exact_optimum} (dibuktikan brute force)`;
-    $("instance-note").textContent = `${info.vehicles} kendaraan, deck ${info.ship.width}×${info.ship.length}, ` +
-      `MaxCapacity ${info.ship.max_capacity}. Sumber: ${info.source}. ${opt}.`;
+    const opt = info.exact_optimum === null ? "" : ` · optimum ${info.exact_optimum}`;
+    $("instance-note").textContent = `${info.vehicles} kendaraan · deck ${info.ship.width}×${info.ship.length} · ` +
+      `kapasitas ${info.ship.max_capacity}${opt}`;
   }
 
   async function runSolver(event) {
@@ -286,15 +285,15 @@
     const button = $("run-btn");
     button.disabled = true;
     const started = performance.now();
-    setStatus(`menjalankan ${RM.ALGORITHMS[ui.algorithm].name} di Python…`, "running");
-    showMessage("Solver sedang berjalan di Python. Hasil baru tampil setelah response diterima.", "info");
+    setStatus("menjalankan…", "running");
+    showMessage("", "info");
     try {
       const resp = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body) });
       const data = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
       const wall = ((performance.now() - started) / 1000).toFixed(1);
-      setRun(data, `run langsung (${body.instance}, seed ${body.seed}, ${wall} s termasuk transfer)`);
+      setRun(data, `run (${body.instance}, ${wall} s)`);
     } catch (err) {
       setStatus("error", "err");
       showMessage(`Run gagal: ${err.message}`, "error");
@@ -437,7 +436,7 @@
       stat("Kendaraan dimuat", `${state.loaded_count} / ${state.placements.length}`),
       stat("Utilisasi area deck", `${((100 * used) / (ship.width * ship.length)).toFixed(1)}%`),
       stat("Total potensi fee", String(potential)),
-      stat("Feasible (backend)", state.feasible ? "ya" : "TIDAK", !state.feasible),
+      stat("Valid", state.feasible ? "ya" : "tidak", !state.feasible),
     );
   }
 

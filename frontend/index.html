@@ -41,9 +41,8 @@
 
       <section class="panel" aria-labelledby="run-heading">
         <h2 id="run-heading">Jalankan solver (Python)</h2>
-        <p id="run-offline" class="muted small" hidden>Mode statis: tombol Run butuh server.
-          Jalankan <code>python -m src.server</code> dari folder <code>work/</code>, lalu buka
-          <code>http://127.0.0.1:8000/</code>.</p>
+        <p id="run-offline" class="muted small" hidden>Tombol Run butuh server: jalankan
+          <code>python -m src.server</code>, lalu buka <code>http://127.0.0.1:8000/</code>.</p>
         <form id="run-form" hidden>
           <label for="instance-select">Problem instance</label>
           <select id="instance-select"></select>
@@ -80,8 +79,8 @@
           <summary>Problem, objective, dan constraint</summary>
           <p>Pilih kendaraan yang dimuat, beserta posisi <code>(x, y)</code> dan orientasinya di deck, untuk
             <strong>memaksimalkan total ShippingFee</strong> kendaraan yang dimuat.</p>
-          <p>Hard constraint (dicek Python, bukan penalty): tidak ada overlap, seluruh kendaraan di dalam deck,
-            total berat ≤ MaxCapacity. Move: swap, relocate, rotate.</p>
+          <p>Constraint: tidak ada overlap, seluruh kendaraan di dalam deck, dan total berat ≤ MaxCapacity.
+            Move: swap, relocate, rotate.</p>
         </details>
         <details>
           <summary>Local optimum ≠ global optimum</summary>
@@ -153,9 +152,7 @@
 
       <section class="panel history" aria-labelledby="history-heading">
         <h2 id="history-heading">Riwayat hasil sesi ini (perbandingan)</h2>
-        <p class="muted small">Bandingkan hanya pada instance yang sama. Seed yang sama tidak berarti lintasan random yang
-          sama antar algoritma. Satu iterasi HC/SA tidak setara dengan satu generasi GA, jadi lihat juga jumlah evaluasi
-          objective dan runtime. Untuk SA, "final" adalah state terminal; best-found ditampilkan terpisah.</p>
+        <p class="muted small">Bandingkan run pada instance yang sama.</p>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Algoritma</th><th>Instance</th><th>Seed</th><th>Parameter</th><th>Final</th>

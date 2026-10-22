@@ -257,12 +257,12 @@
       ["Algoritma", ALGORITHMS[run.algorithm].name],
       ["Seed", run.seed],
       ["Parameter", Object.entries(run.config).map(([k, v]) => `${k}=${v}`).join(", ")],
-      ["Runtime search", `${run.runtime_seconds.toFixed(3)} s`],
+      ["Runtime", `${run.runtime_seconds.toFixed(3)} s`],
       ["Objective awal", run.initial_objective],
       [run.algorithm === "sa" ? "Objective terminal (final)" : run.algorithm === "ga" ? "Objective best-found (final)" :
         run.algorithm === "hc_random_restart" ? "Objective final (terbaik antar restart)" : "Objective final",
         run.final_objective],
-      ["Final feasible (backend)", run.final_state.feasible ? "ya" : "TIDAK"],
+      ["Solusi akhir valid", run.final_state.feasible ? "ya" : "tidak"],
     ];
     if (run.algorithm === "sa") {
       rows.push(["Best-found", `${m.best_found_objective} (iterasi ${m.best_found_iteration})`]);
