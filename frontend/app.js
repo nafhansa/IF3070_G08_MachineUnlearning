@@ -95,7 +95,7 @@
     activeHistory: -1,
   };
 
-  // --- status dan pesan ---------------------------------------------------------
+  // status dan pesan
 
   function setStatus(text, kind) {
     const s = $("status");
@@ -110,7 +110,7 @@
     m.className = `message ${kind || "info"}`;
   }
 
-  // --- memuat hasil ------------------------------------------------------------
+  // memuat hasil
 
   function presets() {
     if (!ui.api) return STATIC_PRESETS;
@@ -190,7 +190,7 @@
     render();
   }
 
-  // --- algoritma ------------------------------------------------------------------
+  // algoritma
 
   // tab "hc" mewakili hc biasa dan semua variannya (hc_*); variannya dipilih lewat dropdown
   const familyOf = (algo) => (algo.startsWith("hc") ? "hc" : algo);
@@ -214,7 +214,7 @@
     buildParamFields();
   }
 
-  // --- run lewat api ----------------------------------------------------------------
+  // run lewat api
 
   // form parameter dibangun dari spesifikasi server, jadi batas dan default hanya didefinisikan di python
   function buildParamFields() {
@@ -302,7 +302,7 @@
     }
   }
 
-  // --- riwayat / perbandingan -------------------------------------------------------
+  // riwayat / perbandingan
 
   function renderHistory() {
     const body = $("history-body");
@@ -331,7 +331,7 @@
     });
   }
 
-  // --- render -------------------------------------------------------------------
+  // render
 
   function renderSummary() {
     const dl = $("summary");
@@ -498,7 +498,7 @@
     render();
   }
 
-  // --- timeline -------------------------------------------------------------------
+  // timeline
 
   function setFrame(i) {
     if (!ui.run) return;
@@ -528,7 +528,7 @@
     }, Math.max(33, 1000 / fps));
   }
 
-  // --- event ----------------------------------------------------------------------
+  // event
 
   function bind() {
     for (const tab of document.querySelectorAll("[data-algo]")) {

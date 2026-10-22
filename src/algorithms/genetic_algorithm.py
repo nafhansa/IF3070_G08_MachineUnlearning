@@ -50,7 +50,7 @@ class GAConfig:
             raise ValueError("repair_tries harus >= 0")
 
 
-# --- operator ------------------------------------------------------------------
+# operator
 
 def roulette_index(cumulative, rng) -> int:
     """fitness-proportional selection (slide 46) dari daftar fitness kumulatif.
@@ -148,7 +148,7 @@ def next_generation(population, fitnesses, problem, cfg: GAConfig, rng, counters
     return new
 
 
-# --- run -----------------------------------------------------------------------
+# run 
 
 def genetic_algorithm(problem, config, seed: int) -> RunResult:
     """jalankan GA dengan satu rng ber-seed. runtime hanya mencakup search (tanpa serialisasi)."""
